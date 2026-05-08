@@ -1,0 +1,7 @@
+services:
+  meowned-podruchny-bot:
+    build: .
+    container_name: meowned-podruchny-bot
+    restart: unless-stopped
+    env_file:
+      - .env
