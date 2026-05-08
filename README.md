@@ -18,7 +18,7 @@ docker compose up --build -d
 
 ```env
 BOT_TOKEN=...
-ADMIN_IDS=1081950251
+ADMIN_IDS=
 ```
 
 `ADMIN_IDS` задается через запятую.
