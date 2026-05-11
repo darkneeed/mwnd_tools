@@ -8,7 +8,9 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 
 from .config import Settings
 from .html_renderer import (
@@ -27,10 +29,35 @@ logger = logging.getLogger(__name__)
 
 settings = Settings.from_env()
 dispatcher = Dispatcher()
+AUTO_MARKUP_BUTTON = "Авторазметка"
+CANCEL_BUTTON = "Назад в меню"
+
+
+class MenuState(StatesGroup):
+    awaiting_auto_markup = State()
 
 
 def is_allowed(user_id: int) -> bool:
     return not settings.admin_ids or user_id in settings.admin_ids
+
+
+def build_main_menu() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=AUTO_MARKUP_BUTTON)],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def build_auto_markup_menu() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=AUTO_MARKUP_BUTTON)],
+            [KeyboardButton(text=CANCEL_BUTTON)],
+        ],
+        resize_keyboard=True,
+    )
 
 
 def build_response(message: Message) -> str:
@@ -61,36 +88,84 @@ def build_response(message: Message) -> str:
 
 
 @dispatcher.message(Command("start"))
-async def handle_start(message: Message) -> None:
+async def handle_start(message: Message, state: FSMContext) -> None:
     if not message.from_user or not is_allowed(message.from_user.id):
         await message.answer("Доступ закрыт.")
         return
 
+    await state.clear()
     await message.answer(
-        "Пришли текст или подпись с Telegram-разметкой. "
-        "Бот вернет HTML-представление, а для premium emoji еще и "
-        "<code>custom_emoji_id</code>.",
+        "Выбери действие в меню.",
+        reply_markup=build_main_menu(),
     )
 
 
 @dispatcher.message(Command("help"))
-async def handle_help(message: Message) -> None:
-    await handle_start(message)
+async def handle_help(message: Message, state: FSMContext) -> None:
+    await handle_start(message, state)
 
 
-@dispatcher.message(F.text | F.caption)
-async def handle_message(message: Message) -> None:
+@dispatcher.message(F.text == AUTO_MARKUP_BUTTON)
+async def handle_auto_markup_entry(message: Message, state: FSMContext) -> None:
     if not message.from_user or not is_allowed(message.from_user.id):
         await message.answer("Доступ закрыт.")
         return
 
-    text, entities = extract_message_payload(message)
+    await state.set_state(MenuState.awaiting_auto_markup)
+    await message.answer(
+        "Пришли текст или подпись с Telegram-разметкой. "
+        "Я верну HTML-представление, а для premium emoji еще и "
+        "<code>custom_emoji_id</code>.",
+        reply_markup=build_auto_markup_menu(),
+    )
 
+
+@dispatcher.message(F.text == CANCEL_BUTTON)
+async def handle_cancel(message: Message, state: FSMContext) -> None:
+    if not message.from_user or not is_allowed(message.from_user.id):
+        await message.answer("Доступ закрыт.")
+        return
+
+    await state.clear()
+    await message.answer(
+        "Меню открыто.",
+        reply_markup=build_main_menu(),
+    )
+
+
+@dispatcher.message(MenuState.awaiting_auto_markup, F.text | F.caption)
+async def handle_auto_markup_message(message: Message) -> None:
+    if not message.from_user or not is_allowed(message.from_user.id):
+        await message.answer("Доступ закрыт.")
+        return
+
+    text, _ = extract_message_payload(message)
     if not text.strip():
         await message.answer("Сообщение пустое.")
         return
 
     await message.answer(build_response(message))
+
+
+@dispatcher.message()
+async def handle_fallback(message: Message, state: FSMContext) -> None:
+    if not message.from_user or not is_allowed(message.from_user.id):
+        await message.answer("Доступ закрыт.")
+        return
+
+    current_state = await state.get_state()
+    if current_state == MenuState.awaiting_auto_markup.state:
+        await message.answer(
+            "Пришли текст или подпись с Telegram-разметкой, либо нажми "
+            f"<code>{CANCEL_BUTTON}</code>.",
+            reply_markup=build_auto_markup_menu(),
+        )
+        return
+
+    await message.answer(
+        "Выбери действие в меню.",
+        reply_markup=build_main_menu(),
+    )
 
 
 async def main() -> None:
