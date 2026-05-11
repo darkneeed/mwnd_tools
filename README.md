@@ -1,6 +1,6 @@
-# meowned podruchny
+# meowned подручный
 
-Telegram-бот в Docker для утилит "meowned подручный".
+Telegram-бот в Docker для различных утилит
 
 Пока реализована одна функция:
 - принимает текст или подпись с Telegram-разметкой;
@@ -12,6 +12,9 @@ Telegram-бот в Docker для утилит "meowned подручный".
 ## Запуск
 
 ```bash
+cd /opt/ | git clone https://github.com/darkneeed/mwnd_tools.git
+cd mwnd_tools
+cp .env.example .env && nano .env
 docker compose up --build -d
 ```
 
@@ -19,7 +22,7 @@ docker compose up --build -d
 
 ```env
 BOT_TOKEN=...
-ADMIN_IDS=1081950251
+ADMIN_IDS=...
 ```
 
-`ADMIN_IDS` задается через запятую.
+`ADMIN_IDS` задаются через запятую.
