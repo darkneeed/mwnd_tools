@@ -47,7 +47,7 @@ class RenderMessageHtmlTests(unittest.TestCase):
 
         self.assertEqual(
             result,
-            '<pre><code class="language-python">print(1)</code></pre>',
+            '<pre><code language="language-python">print(1)</code></pre>',
         )
 
     def test_renders_text_link(self) -> None:
