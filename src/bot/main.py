@@ -14,7 +14,7 @@ from .config import Settings
 from .html_renderer import (
     extract_message_payload,
     find_custom_emoji_entities,
-    render_custom_emoji_html,
+    render_message_html,
 )
 
 
@@ -36,7 +36,7 @@ def is_allowed(user_id: int) -> bool:
 def build_response(message: Message) -> str:
     text, entities = extract_message_payload(message)
     custom_entities = find_custom_emoji_entities(entities)
-    rendered_html = render_custom_emoji_html(text, entities)
+    rendered_html = render_message_html(text, entities)
 
     emoji_lines = []
     for index, entity in enumerate(custom_entities, start=1):
@@ -44,11 +44,17 @@ def build_response(message: Message) -> str:
             f'{index}. <code>{escape(entity.custom_emoji_id)}</code>'
         )
 
-    emoji_section = "\n".join(emoji_lines)
+    emoji_section = ""
+    if emoji_lines:
+        emoji_body = "\n".join(emoji_lines)
+        emoji_section = (
+            f"<b>Custom emoji ID</b>\n{emoji_body}\n\n"
+        )
+
     raw_markup = escape(rendered_html)
 
     return (
-        f"<b>Custom emoji ID</b>\n{emoji_section}\n\n"
+        f"{emoji_section}"
         f"<b>HTML</b>\n<pre>{raw_markup}</pre>\n\n"
         f"<b>Preview</b>\n{rendered_html}"
     )
@@ -61,8 +67,9 @@ async def handle_start(message: Message) -> None:
         return
 
     await message.answer(
-        "Пришли сообщение с кастомным эмоджи. "
-        "Бот вернет <code>custom_emoji_id</code> и HTML-разметку.",
+        "Пришли текст или подпись с Telegram-разметкой. "
+        "Бот вернет HTML-представление, а для premium emoji еще и "
+        "<code>custom_emoji_id</code>.",
     )
 
 
@@ -78,13 +85,6 @@ async def handle_message(message: Message) -> None:
         return
 
     text, entities = extract_message_payload(message)
-    custom_entities = find_custom_emoji_entities(entities)
-
-    if not custom_entities:
-        await message.answer(
-            "Не вижу кастомных эмоджи. Пришли текст или подпись, где они есть."
-        )
-        return
 
     if not text.strip():
         await message.answer("Сообщение пустое.")
